@@ -1,0 +1,58 @@
+/*
+   Project factory1
+
+   Gradle build file for Jason Application
+   September 27, 2021 - 17:15:20
+*/
+
+defaultTasks 'run'
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+version '1.0'
+group   'org.jason'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+
+    //maven { url "http://jacamo.sourceforge.net/maven2" }
+    maven { url "https://raw.github.com/jacamo-lang/mvn-repo/master" }
+    maven { url "https://jade.tilab.com/maven/" }
+    
+    flatDir { dirs 'lib' }
+}
+
+dependencies {
+    compile group: 'org.jason',     name: 'jason' ,   version: '2.5.1'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/java'
+        }
+        resources {
+            srcDir 'src/resources'
+        }
+    }
+}
+
+task run (type: JavaExec, dependsOn: 'classes') {
+    description 'runs the application'
+    main = 'jason.infra.centralised.RunCentralisedMAS'
+    args 'factory1.mas2j'
+	// options:
+	//     args = ['factory1.mas2j', '--debug']
+	//     args = ['factory1.mas2j', '--log-conf', 'l.p'] // to use file l.p to configure logging
+    classpath sourceSets.main.runtimeClasspath
+}
+
+clean {
+    delete 'bin'
+    delete 'build'
+}
+
