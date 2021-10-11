@@ -15,7 +15,6 @@ waitingposition(270,613,90).
 !start.
 +!start : true
 <- .print("Robotic arm agent: Hello!");
-   .wait(5000);
    !positionParts.
    
 // Intentionally individual plans per part to make sure we process parts
@@ -27,21 +26,21 @@ waitingposition(270,613,90).
 <- .print("Robotic arm agent: requesting access to assembly areas 1 and 2.");
    .my_name(Agent);
    .send(assemblyareaagent,achieve,fullAreaLockFor(Agent));
-   .wait(200);
+   .wait(300);
    !positionParts.
     
 +!positionParts : binfull(Part) & Part>=4 & not holding(Part) & not lockedArea(1)
 <- .print("Robotic arm agent: requesting access to assembly area 1.");
    .my_name(Agent);
    .send(assemblyareaagent,achieve,lockAreaFor(Agent,1));
-   .wait(200);
+   .wait(300);
    !positionParts.
    
 +!positionParts : not (binfull(Part) & Part<4 & not holding(Part)) & lockedArea(2)
 <- .print("Robotic arm agent: releasing access to assembly area 2.");
    .my_name(Agent);
    .send(assemblyareaagent,achieve,unlockAreaFor(Agent,2));
-   .wait(200);
+   .wait(300);
    !positionParts.
 
 +!positionParts : binfull(1) & not holding(1) & lockedArea(2)
@@ -132,7 +131,7 @@ waitingposition(270,613,90).
 <- .print("Robotic arm agent: releasing lock from area ",Area);
    .my_name(Agent);
    .send(assemblyareaagent,achieve,unlockAreaFor(Agent,Area));
-   .wait(200);
+   .wait(100);
    !parkArm.
    
 +!parkArm.

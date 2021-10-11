@@ -186,11 +186,6 @@ public class fac1env extends Environment {
 			model.moverPercept = newMoverPercept;
 			addPercept(model.moverPercept);
 		}
-		if (model.moving) {
-			addPercept(Literal.parseLiteral("mover(hold)"));
-		} else {
-			removePercept(Literal.parseLiteral("mover(hold)"));
-		}
 		
     }
 

@@ -49,13 +49,15 @@ weldingCompleted :- joints(N) & jointDone(N).
 +!pickFrame : true
 <- ?partPosition(4,X,Y,_);
    !moveTo(X,Y);
-   pick_part(4).
+   pick_part(4);
+   .broadcast(tell,mover(hold)).
    
 // Moving the frame away from the main assembly area
-+!moveAway : mover(hold) & holdersReleased
++!moveAway : holdersReleased
 <- ?framestockposition(X2,Y2);  	
    !moveTo(X2,Y2);
    release_part;
+   .broadcast(untell,mover(hold));
    !awaitUnlockArea;
    !parkArm.
 
