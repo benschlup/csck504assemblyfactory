@@ -9,16 +9,14 @@
 	
 // The following position should be used to park the robotic arm outside
 // the main assembly area or in a hovering position when waiting for new parts
-waitingposition(270,720,90).
-hoverposition(270,613,90).
-
-+readyForAssembly : true
-<- .print("Robotic arm agent: Restarting part positioning process!");
-   !positionParts.
+waitingposition(270,613,90).
 
 // Initial "hello" message, then embrace the goal to position parts
+!start.
 +!start : true
-<- .print("Robotic arm agent: Hello!").
+<- .print("Robotic arm agent: Hello!");
+   .wait(5000);
+   !positionParts.
    
 // Intentionally individual plans per part to make sure we process parts
 // in a preferred sequence. A generic plan resulted in suboptimal 
@@ -26,22 +24,26 @@ hoverposition(270,613,90).
 // possible time.
 
 +!positionParts : binfull(Part) & Part<4 & not holding(Part) & (not lockedArea(2) | not lockedArea(1))
-<- !!hoverArm;
-   .print("Robotic arm agent: requesting access to assembly areas 1 and 2.");
+<- .print("Robotic arm agent: requesting access to assembly areas 1 and 2.");
    .my_name(Agent);
-   .send(assemblyareaagent,achieve,lockAreaFor(Agent,2));
-   .send(assemblyareaagent,achieve,lockAreaFor(Agent,1));
+   .send(assemblyareaagent,achieve,fullAreaLockFor(Agent));
    .wait(200);
    !positionParts.
-  
+    
 +!positionParts : binfull(Part) & Part>=4 & not holding(Part) & not lockedArea(1)
-<- !!hoverArm;
-   .print("Robotic arm agent: requesting access to assembly area 1.");
+<- .print("Robotic arm agent: requesting access to assembly area 1.");
    .my_name(Agent);
    .send(assemblyareaagent,achieve,lockAreaFor(Agent,1));
    .wait(200);
    !positionParts.
    
++!positionParts : not (binfull(Part) & Part<4 & not holding(Part)) & lockedArea(2)
+<- .print("Robotic arm agent: releasing access to assembly area 2.");
+   .my_name(Agent);
+   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,2));
+   .wait(200);
+   !positionParts.
+
 +!positionParts : binfull(1) & not holding(1) & lockedArea(2)
 <- !pickupAndpositionPart(1);
    !positionParts.
@@ -69,12 +71,14 @@ hoverposition(270,613,90).
 // In case we are still missing any part(s) we retry 
 +!positionParts : not (holding(1) & holding(2) & holding(3) &
                        holding(4) & holding(5) & holding(6))
-<- !hoverArm;
+<- .wait(200);
    !positionParts.
 	
-// Otherwise, the positionParts process has completed
+// Otherwise, the positionParts process has completed; park & restart cycle
 +!positionParts : true
-<- !!parkArm.
+<- !!parkArm;
+   .wait(200);
+   !positionParts.
 
 // A plan to move towards a specific position and putting the gripper
 // into a specified angle
@@ -96,7 +100,6 @@ hoverposition(270,613,90).
 // potential cocurrent intention to park the robotic arm
 +!pickupPart(Part) : true
 <- .drop_intention(parkArm);
-   .drop_intention(hoverArm);
    .print("Robotic arm agent: picking part from bin ", Part, ".");
    ?binPosition(Part,X1,Y1);
    !moveTo(X1,Y1,90);
@@ -108,6 +111,7 @@ hoverposition(270,613,90).
 <- ?partPosition(Part,X2,Y2,Angle);
    !moveTo(X2,Y2,Angle);
    .broadcast(tell,part_in_place(Part));
+   .wait(200);
    !positionPart(Part).
 
 // Now that the holder has confirmed the fixing of the part, the gripper can
@@ -116,31 +120,20 @@ hoverposition(270,613,90).
 <- .print("Robotic arm agent: releasing part ", Part, ".");
    .broadcast(untell,part_in_place(Part));
    release_part;
-   !awaitUnlockArea.
- 
-// Wait until assembly area is not locked any longer
-+!awaitUnlockArea : lockedArea(_)
-<- .print("Robotic arm agent: giving way to others.");
-   .my_name(Agent);
-   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,1));
-   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,2));
-   .wait(200);
-   !awaitUnlockArea.
+   !!parkArm.
    
-+!awaitUnlockArea : not lockedArea(Area).
-   
-// Position the arm in a hovering position to quickly reach a new part
-+!hoverArm : true
-<- ?hoverposition(X,Y,Angle);
-   !hoverArm(X,Y,Angle).
-   
-+!hoverArm(X,Y,Angle) : not gripper(X,Y,Angle)
-<- !moveTo(X,Y,Angle).
-
-+!hoverArm(X,Y,Angle) : gripper(X,Y,Angle).
-
 // Position the arm in a waiting position outside the main assembly area
-+!parkArm : true
++!parkArm : waitingposition(X,Y,Angle) & not gripper(X,Y,Angle)
 <- ?waitingposition(X,Y,Angle);
-   !moveTo(X,Y,Angle).
+   !moveTo(X,Y,Angle);
+   !parkArm.
+   
++!parkArm : lockedArea(Area)
+<- .print("Robotic arm agent: releasing lock from area ",Area);
+   .my_name(Agent);
+   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,Area));
+   .wait(200);
+   !parkArm.
+   
++!parkArm.
 

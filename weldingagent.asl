@@ -6,7 +6,6 @@
 // the main assembly area
 waitingposition(1000,470).
 
-
 // Let's assume a welder percept is not always available: let's retry
 // (Background are limitations of the environment simulation.)
 +?welder(X,Y) : true
@@ -21,31 +20,21 @@ jointPartsInPlace(5) :- holding(5) & holding(6).
 
 // Rule for complete holder release
 holdersReleased(N) :- not holding(N) & (N = 1 | holdersReleased(N-1)). 
-holdersReleased :- holdersReleased(6).
-
-// Rule for identifying completely welded frame
-jointsDone(N) :- joint(N) & (N = 1 | joint(N-1)).
-jointsDone :- jointsDone(5).
+holdersReleased :- holders(N) & holdersReleased(N).
 
 // Embrace initial plan
 !main.
 
 +!main : true
 <- .print("Welding robot: waiting for new parts");
-   !weldParts;
-   !waitForFrameRemoval;
-   !forgetJoints;
-   !main.
+   !weldParts.
 
-// Plan to forget welded joints (note that a recursive version didn't work)
-+!forgetJoints : true
-<- -joint(1);
-   -joint(2);
-   -joint(3);
-   -joint(4);
-   -joint(5).
+// Forget welded joints if all holders have been released
++!weldParts : joint(_) & holdersReleased
+<- !forgetJoints;
+   !weldParts.
    
-// In case we are getting a new percept that a holder has fixed a part,
+// In case we we see that required parts for joint 1 have been fixed,
 // we check if we need to weld it. 
 // If we need to move the welder to the assembly area, lock it first.
 +!weldParts : jointPartsInPlace(1) & not joint(1) & not lockedArea(2)
@@ -53,14 +42,6 @@ jointsDone :- jointsDone(5).
    .my_name(Agent);
    .send(assemblyareaagent,achieve,lockAreaFor(Agent,2));
    .send(assemblyareaagent,achieve,unlockAreaFor(Agent,1));
-   .wait(200); // be careful to not request access too frequently
-   !weldParts.
-
-+!weldParts : Joint > 1 & jointPartsInPlace(Joint) & not joint(Joint) & (not lockedArea(1) | not lockedArea(2)) & not (jointPartsInPlace(1) & not joint(1))
-<- .print("Welding robot: requesting access to assembly areas 1 and 2.");
-   .my_name(Agent);
-   .send(assemblyareaagent,achieve,lockAreaFor(Agent,1));
-   .send(assemblyareaagent,achieve,lockAreaFor(Agent,2));
    .wait(200); // be careful to not request access too frequently
    !weldParts.
    
@@ -74,25 +55,29 @@ jointsDone :- jointsDone(5).
    !moveTo(X,Y);
    weld;
    +joint(Joint);
+   .broadcast(tell,joint(Joint));
    !!parkArm;
+   !weldParts.   
+   
+// In case parts required for another joint are in place, lock area
++!weldParts : Joint > 1 & jointPartsInPlace(Joint) & not joint(Joint) & (not lockedArea(1) | not lockedArea(2))
+<- .print("Welding robot: requesting access to assembly areas 1 and 2.");
+   .my_name(Agent);
+   .send(assemblyareaagent,achieve,fullAreaLockFor(Agent));
+   .wait(200); // be careful to not request access too frequently
    !weldParts.
    
-// Retry cycle if not all joints done 
-+!weldParts : not jointsDone
-<- .wait(200); // not retry to frequently
-   !weldParts.
-
-// Once we arrive here, the frame is complete
 +!weldParts : true
-<- .print("Finished, tell the mover agent!");
-   .send(movingagent,achieve,removeFrame).
+<- !weldParts.
 
-// Plan to wait for all holders being released, to know when the frame is moved away
-+!waitForFrameRemoval : not holdersReleased
-<- !waitForFrameRemoval.
-
-+!waitForFrameRemoval : holdersReleased.
-
+// Forget all joints
++!forgetJoints : joint(N)
+<- -joint(N);
+   .broadcast(untell,joint(N));
+   !forgetJoints.
+   
++!forgetJoints.   
+   
 // Plan for moving the welding tool around 
 +!moveTo(X,Y) : not welder(X,Y)
   <- move_towards(X,Y,0);
@@ -102,10 +87,18 @@ jointsDone :- jointsDone(5).
 +!moveTo(X,Y) : welder(X,Y).
 
 // When the robot has no job, park the arm outside the main assembly area
-+!parkArm : true
-<- ?waitingposition(X,Y);
-   !moveTo(X,Y);
-   .print("Welding agent: giving way to others.");
++!parkArm : waitingposition(X,Y) & not welder(X,Y)
+<- !moveTo(X,Y);
+   !parkArm;.
+   
++!parkArm : lockedArea(Area)
+<- !moveTo(X,Y);
+   .print("Welding arm agent: releasing lock from area ",Area);
    .my_name(Agent);
-   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,1));
-   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,2)).
+   .send(assemblyareaagent,achieve,unlockAreaFor(Agent,Area));
+   .wait(200)
+   !parkArm;.
+   
++!parkArm.
+  
+   

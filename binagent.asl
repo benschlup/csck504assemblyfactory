@@ -2,6 +2,9 @@
 // 07 October 2021
 // Contact: benjamin.schlup@schlup.com
 
+// Initial configuration option: maximum duration until a part arrives
+timer(25000).
+
 // Note that bins would usually be environmental entities and not agents:
 // But it was easier to implement them as agents for experimental purposes.
 
@@ -28,9 +31,10 @@ binnumber(6,binagent6).
 
 +!refill : true
  <- ?binnumber(N);
+    ?timer(T);
     .random(X);
-	.print("Bin agent ",N," waiting ",X*25 div 1, " seconds for new parts...");
-    .wait(X*25000);
+	.print("Bin agent ",N," waiting ",X*T div 1000, " seconds for new parts...");
+    .wait(X*T);
 	.print("Bin agent ",N," has received new parts.");
     refill_bin(N).
                        

@@ -2,65 +2,51 @@
 // 07 October 2021
 // Contact: benjamin.schlup@schlup.com
 
-// Initial intention
-!maintenance_loop.
+// Initial intention: None
 
-// Rule for complete holder release
-holdersReleased(N) :- not holding(N) & (N = 1 | holdersReleased(N-1)). 
-holdersReleased :- holdersReleased(6).
 
-// Let's assume percepts are not always available: let's retry
-
-+?gripper(X,Y,A) : true
-  <-?gripper(X,Y,A).
-
-+?welder(X,Y) : true
-  <-?welder(X,Y).
-
-+?mover(X,Y) : true
-  <-?mover(X,Y).
-  
-// Main maintenance loop
-+!maintenance_loop : true
-<- .print("Assembly Area Agent: ready for assembling frame.");
-   .broadcast(tell,readyForAssembly);
-   !waitForUsage;
-   .print("Assembly Area Agent: assembly area busy.");
-   .broadcast(untell,readyForAssembly);
-   !waitForFree(0,0,0);
-   !maintenance_loop.
-
-// Wait until an indication that the assembly process has started
-+!waitForUsage : holdersReleased
-<-!waitForUsage.
+// Reserve full assembly area for an agent
+@FullLock [atomic]
++!fullAreaLockFor(Agent): (lockedAreaFor(Agent,1) & not lockedAreaFor(_,2)) |
+						  (lockedAreaFor(Agent,2) & not lockedAreaFor(_,1)) |
+						  (not lockedAreaFor(_,1) & not lockedAreaFor(_,2))
+<- .print("Assembly Area Agent: locking full assembly area for ",Agent);
+   +lockedAreaFor(Agent,1);
+   +lockedAreaFor(Agent,2);
+   lock_area(1);
+   lock_area(2);
+   .send(Agent,tell,lockedArea(1));
+   .send(Agent,tell,lockedArea(2));
+   .print("Assembly Area Agent: locked assembly area for ",Agent);.
    
-+!waitForUsage.
++!fullAreaLockFor(Agent).
    
-   
-// Notify everyone when the area is not being used any longer
-+!waitForFree(Wx,Gy,My) : not holdersReleased  | Wx < 1000  | Gy < 720 | My > 70
-<- ?welder(Wx1,_);
-   ?gripper(_,Gy1,_);
-   ?mover(_,My1);
-   !waitForFree(Wx1,Gy1,My1).
-   
-+!waitForFree(_,_,_).
-   
-// Reserve assembly area for an agent
-@Lock [atomic]
-+!lockAreaFor(Agent,Area): not lockedAreaFor(_,Area)
-<- +lockedAreaFor(Agent,Area);
+@PartialLock [atomic]
++!lockAreaFor(Agent,Area): lockedAreaFor(Agent,Area) | not lockedAreaFor(_,Area)
+<- .print("Assembly Area Agent: locking subsector ",Area," for ",Agent);
+   +lockedAreaFor(Agent,Area);
    lock_area(Area);
-   .send(Agent,tell,lockedArea(Area)).
+   .send(Agent,tell,lockedArea(Area));
+   .print("Assembly Area Agent: locked subsector ",Area," for ",Agent);.
    
-+!lockAreaFor(Agent,Area).
++!lockAreaFor(Agent,Area) : true
+<- .print("Assembly Area Agent: cannot lock subsector ",Area," for agent ", Agent).
 
-// Reserve assembly area for an agent
+// Unreserve assembly area for an agent
+@FullUnlock [atomic]
++!fullAreaUnlockFor(Agent) : lockedAreaFor(Agent,1) & lockedAreaFor(Agent,2)
+<- -lockedAreaFor(Agent,1);
+   -lockedAreaFor(Agent,2);
+   .send(Agent,untell,lockedArea(1));
+   .send(Agent,untell,lockedArea(2));
+   unlock_area(1);
+   unlock_area(2).
+
 @Unlock [atomic]
 +!unlockAreaFor(Agent,Area) : lockedAreaFor(Agent,Area)
 <- -lockedAreaFor(Agent,Area);
-   unlock_area(Area);
-   .send(Agent,untell,lockedArea(Area)).
-   
-+!unlockAreaFor(Agent,Area) : true.   
+   .send(Agent,untell,lockedArea(Area));
+   unlock_area(Area).
+
++!unlockAreaFor(Agent,Area).   
 

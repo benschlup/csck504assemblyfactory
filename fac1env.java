@@ -38,12 +38,13 @@ public class fac1env extends Environment {
 
 	public static final int bins = 6; // number of bins
 	public static final int parts = 6; // number of parts
+	public static final int holders = 6; // number of holders
 	public static final int joints = 5; // number of joints
 	public static final int lockareas = 2; // number of sub-assembly areas for locking
 
 	public static final int[] partLengths = new int[]{ 55,410,452,256,275,167 };
 	public static final int[][] holderPositions = new int[][]{ {910,210},{757,183},{785,270},{500,309},{422,309},{449,448} };
-	public static final int[] armPosition = new int[] {600, 720};	
+	public static final int[] armPosition = new int[] {600, 613};	
 	public static final int[] welderRobotPosition = new int[] {1000, 70};
 	public static final int[] moverRobotPosition = new int[] {300, 70};		
 	public static final int[][] binPositions = new int[][]{{270,538},{270,568},{270,598},{270,628},{270,658},{270,688}};
@@ -81,7 +82,7 @@ public class fac1env extends Environment {
     public boolean executeAction(String ag, Structure action) {
 
 
-        //logger.info("executing: "+action+" on behalf of "+ag+"!");
+        // logger.info("executing: "+action+" on behalf of "+ag+"!");
 		
 		try {
 	    	if (action.getFunctor().equals("pick_part")) {
@@ -119,7 +120,7 @@ public class fac1env extends Environment {
 		updatePercepts();
 		/*
         try {
-            Thread.sleep(10);
+            Thread.sleep(100);
         } catch (Exception e) {}
 		*/
         informAgsEnvironmentChanged();
@@ -139,6 +140,7 @@ public class fac1env extends Environment {
 		// make sure all environment constants are available as percepts
 		addPercept(Literal.parseLiteral("bins("+Integer.toString(bins)+")"));
 		addPercept(Literal.parseLiteral("parts("+Integer.toString(parts)+")"));
+		addPercept(Literal.parseLiteral("holders("+Integer.toString(holders)+")"));
 		addPercept(Literal.parseLiteral("joints("+Integer.toString(joints)+")"));
 		addPercept(Literal.parseLiteral("armPosition("+Integer.toString(armPosition[0])+","+Integer.toString(armPosition[1])+")"));
 		addPercept(Literal.parseLiteral("welderRobotPosition("+Integer.toString(welderRobotPosition[0])+","+Integer.toString(welderRobotPosition[1])+")"));
@@ -202,12 +204,12 @@ public class fac1env extends Environment {
 		public Boolean[] holding  = new Boolean[bins];
 		public Boolean[] joint  = new Boolean[joints];
 		public Boolean[] lockArea  = new Boolean[lockareas];
-		public int[] gripperPosition = new int[] {270, 720, 90};
+		public int[] gripperPosition = new int[] {270, 613, 90};
 		public int[] welderPosition = new int[] {1000, 470};
 		public int[] moverPosition = new int[] {500, 70};
-		public Literal gripperPercept = Literal.parseLiteral("gripper(300,400,90)");
-		public Literal welderPercept = Literal.parseLiteral("welder(800,100)");
-		public Literal moverPercept = Literal.parseLiteral("mover(800,100)");
+		public Literal gripperPercept = Literal.parseLiteral("gripper(270,613,90)");
+		public Literal welderPercept = Literal.parseLiteral("welder(1000,470)");
+		public Literal moverPercept = Literal.parseLiteral("mover(500,70)");
 				
         Random random = new Random(System.currentTimeMillis());
 
@@ -217,6 +219,11 @@ public class fac1env extends Environment {
 			Arrays.fill(joint, Boolean.FALSE);
 			Arrays.fill(lockArea, Boolean.FALSE);
         }
+		
+		public boolean holding() {
+			for (int i = 0; i<holders; i++) if (holding[i]) return true;
+			return false;
+		}
         
         void pickPart(String ag, int partnum) {
 			if (ag.equals("movingagent") && 
@@ -238,8 +245,8 @@ public class fac1env extends Environment {
 						logger.info("Welding");
 					welding = true;
 					try { Thread.sleep(5000); } catch (Exception e) {}
-					welding = false;
 					joint[i] = true;
+					welding = false;
 				}
 			}
 		}
@@ -343,7 +350,7 @@ public class fac1env extends Environment {
 			JFrame frame = new JFrame("Assembly Factory");
 			
       	    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(1080, 830);
+            frame.setSize(1080, 750);
 			frame.setLocationRelativeTo(null);
 			frame.add(new FactoryCanvas());
 			frame.setVisible(true);
@@ -421,9 +428,7 @@ public class fac1env extends Environment {
 				gg.setColor(Color.BLACK);
 				gg.setFont(new Font("SansSerif", Font.PLAIN, 12));
 				gg.drawString("Bin "+Integer.toString(i), 10,510+i*30);
-				if (model.binfull[i-1]) {
-					paintPart(gg, i, 90, binPositions[i-1][0], binPositions[i-1][1]);
-				}
+				if (model.binfull[i-1]) paintPart(gg, i, 90, binPositions[i-1][0], binPositions[i-1][1]);
 			}
 			
 			// Paint holder status
@@ -440,7 +445,7 @@ public class fac1env extends Environment {
 			}
 			
 			// Paint joints
-			if (model.holding[0]) paintJoints(gg, 0, 0);
+			if (model.holding()) paintJoints(gg, 0, 0);
 			
 			// Paint robotic arm
 			gg.setColor(Color.BLUE);

@@ -4,11 +4,16 @@
 // Belief of a position where we can park the welding tool outside
 // the main assembly area
 waitingposition(500,70).
-framestockposition(-500,300).
+framestockposition(-400,300).
 
 // Rule for complete holder release
 holdersReleased(N) :- not holding(N) & (N = 1 | holdersReleased(N-1)). 
 holdersReleased :- holdersReleased(6).
+
+// Rule for noticing when welding completed
+jointDone(N) :- joint(N) & (N = 1 | jointDone(N-1)). 
+weldingCompleted :- joints(N) & jointDone(N).
+
 
 // Let's assume a mover percept is not always available: let's retry
 // (Background are limitations of the environment simulation.)
@@ -19,13 +24,26 @@ holdersReleased :- holdersReleased(6).
 !start.
 
 +!start : true
-<- .print("Moving robot: waiting for request to remove frame").
+<- .print("Moving robot: waiting for finished frame");
+   !removeFrame.
 
 // Act on a request to move the frame away
-+!removeFrame : true
++!removeFrame : weldingCompleted & not (lockedArea(1) & lockedArea(2))
+<- .print("Moving robot: requesting access to assembly area.");
+   .my_name(Agent);
+   .send(assemblyareaagent,achieve,fullAreaLockFor(Agent));
+   .wait(200);
+   !removeFrame.
+   
++!removeFrame : weldingCompleted & lockedArea(1) & lockedArea(2)
 <- .print("Moving robot: moving finished frame away.");
    !pickFrame;
-   !moveAway.
+   !moveAway;
+   !removeFrame.
+   
++!removeFrame : not weldingCompleted
+<- .wait(200);
+   !removeFrame.
    
 // Pickup the whole frame
 +!pickFrame : true
@@ -38,6 +56,7 @@ holdersReleased :- holdersReleased(6).
 <- ?framestockposition(X2,Y2);  	
    !moveTo(X2,Y2);
    release_part;
+   !awaitUnlockArea;
    !parkArm.
 
 // In case holders still fix the frame, retry after 200ms
@@ -57,4 +76,15 @@ holdersReleased :- holdersReleased(6).
 +!parkArm : true
 <- ?waitingposition(X,Y);
    !moveTo(X,Y).
+   
+   
+// Wait until assembly area is not locked any longer
++!awaitUnlockArea : lockedArea(_)
+<- .print("Moving robot: giving way to others.");
+   .my_name(Agent);
+   .send(assemblyareaagent,achieve,fullAreaUnlockFor(Agent));
+   .wait(200);
+   !awaitUnlockArea.
+   
++!awaitUnlockArea.
    
